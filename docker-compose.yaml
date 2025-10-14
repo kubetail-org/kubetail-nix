@@ -1,0 +1,39 @@
+services:
+  kubetail-nix-dev:
+    container_name: kubetail-nix-dev
+    build:
+      dockerfile_inline: |
+        FROM ubuntu:24.04
+
+        RUN apt-get update && \
+            apt-get install -y curl xz-utils git
+
+        # Create nixbld group and nixuser user with home directory, then add user to group
+        RUN groupadd -r nixbld && \
+            useradd -r -m -g nixbld nixuser
+
+        # Create /nix directory with 0755 permissions owned by nixuser
+        RUN mkdir -m 0755 /nix && \
+            chown nixuser /nix
+
+        # Set default user
+        USER nixuser
+
+        # Install single-user nix
+        RUN curl --proto '=https' --tlsv1.2 -L https://nixos.org/nix/install | sh -s -- --no-daemon
+
+        # Configure Nix to enable experimental features
+        RUN mkdir -p ~/.config/nix && \
+            echo "experimental-features = nix-command flakes" > ~/.config/nix/nix.conf
+
+        # Add Nix to PATH in .profile
+        RUN cat >> ~/.bashrc <<'EOF'
+        export PATH="/home/nixuser/.local/state/nix/profiles/profile/bin:$PATH"
+        if [ -e /home/nixuser/.nix-profile/etc/profile.d/nix.sh ]; then . /home/nixuser/.nix-profile/etc/profile.d/nix.sh; fi
+        EOF
+    working_dir: /kubetail-nix
+    volumes:
+      - ./:/kubetail-nix
+    stdin_open: true
+    tty: true
+    stop_grace_period: 0s
