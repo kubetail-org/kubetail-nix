@@ -16,9 +16,18 @@
       system:
       let
         pkgs = import nixpkgs { inherit system; };
+
+        myPackage = pkgs.callPackage ./default.nix { };
       in
       {
-        packages.default = pkgs.callPackage ./default.nix { };
+        packages.default = myPackage;
+
+        # For nix run
+        apps.default = {
+          type = "app";
+          program = "${myPackage}/bin/kubetail";
+          meta = myPackage.meta;
+        };
       }
     );
 }
