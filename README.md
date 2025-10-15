@@ -19,13 +19,13 @@ nix profile add github:kubetail-org/kubetail-nix
 
 ```console
 # Try without installing
-nix-build https://github.com/kubetail-org/kubetail-nix/archive/refs/tags/0.9.0.tar.gz
+nix-build https://github.com/kubetail-org/kubetail-nix/archive/refs/heads/main.tar.gz
 
 # Open a shell with `kubetail` installed
-nix-shell https://github.com/kubetail-org/kubetail-nix/archive/refs/tags/0.9.0.tar.gz
+nix-shell https://github.com/kubetail-org/kubetail-nix/archive/refs/heads/main.tar.gz
 
 # Install to your profile
-nix-env -i -f https://github.com/kubetail-org/kubetail-nix/archive/refs/tags/0.9.0.tar.gz
+nix-env -i -f https://github.com/kubetail-org/kubetail-nix/archive/refs/heads/main.tar.gz
 ```
 
 ## Usage
