@@ -1,101 +1,90 @@
 {
-  pkgs ? import <nixpkgs> {},
-}: let
-  inherit (pkgs) lib;
-  sources = builtins.fromJSON (lib.strings.fileContents ./sources.json);
+  pkgs ? import <nixpkgs> { },
+}:
 
-  # mkSourceInstall makes a derivation that installs `kubetail` from source
-  mkSourceInstall = {
-    version,
-    url,
-    hash,
-    goDepsSrc,
-    pnpmDepsSrc,
-  }: let
-    pname = "kubetail";
-    src = pkgs.fetchurl {inherit url hash;};
+let
+  pname = "kubetail";
+  version = "0.9.0";
 
-    # Fetch pnpm dependencies
-    pnpmDeps = pkgs.fetchzip {
-      nativeBuildInputs = [ pkgs.zstd ];
-      url = pnpmDepsSrc.url;
-      sha256 = pnpmDepsSrc.hash;
-      stripRoot = false;
+  src = pkgs.fetchFromGitHub {
+    owner = "kubetail-org";
+    repo = "kubetail";
+    tag = "cli/v${version}";
+    sha256 = "sha256-n5kHK/cJcDfCy/zQBtHPAxVCnm6RKvHwB5P1o3wthuM=";
+  };
+
+  frontend = pkgs.stdenv.mkDerivation {
+    inherit version src;
+    pname = "${pname}-frontend";
+
+    nativeBuildInputs = [
+      pkgs.nodejs
+      pkgs.nodePackages.pnpm
+      pkgs.pnpm.configHook
+    ];
+
+    pnpmRoot = "dashboard-ui";
+
+    pnpmDeps = pkgs.pnpm.fetchDeps {
+      inherit pname version;
+      src = "${src}/dashboard-ui";
+      hash = "sha256-CwHHR1hhIDWfMJSlFkPuOmf/mTzbNt4RWEHPwJ5fJO8=";
+      fetcherVersion = 2;
     };
 
-    # Fetch go dependencies
-    goDeps = pkgs.fetchzip {
-      nativeBuildInputs = [ pkgs.zstd ];
-      url = goDepsSrc.url;
-      sha256 = goDepsSrc.hash;
-      stripRoot = false;
-    };    
-  in
-    pkgs.stdenv.mkDerivation {
-      inherit pname src version pnpmDeps goDeps;
+    buildPhase = ''
+      cd dashboard-ui
+      pnpm build
+      cd ../
+    '';
 
-      name = "${pname}-${version}";
+    installPhase = ''
+      cp -r dashboard-ui/dist $out
+    '';
+  };
 
-      buildInputs = [
-        pkgs.go
-        pkgs.nodejs
-        pkgs.nodePackages.pnpm
-        pkgs.pnpm.configHook
-      ];
+  backend = pkgs.buildGoModule {
+    inherit pname version;
+    src = "${src}/modules";
 
-      pnpmRoot = "dashboard-ui";
-      pnpmInstallFlags = "--store-dir=${pnpmDeps}/pnpm-store";
+    nativeBuildInputs = with pkgs; [
+      installShellFiles
+    ];
 
-      buildPhase = ''
-        runHook preBuild
+    modRoot = "cli";
+    subPackages = [ "." ];
 
-        cd dashboard-ui
-        pnpm build
-        cd ..
-        rm -rf modules/dashboard/website
-	      cp -r dashboard-ui/dist modules/dashboard/website
+    prePatch = ''
+      rm -rf dashboard/website
+      cp -r ${frontend} dashboard/website
+    '';
 
-        ln -s ${goDeps}/vendor ./modules/vendor
-        cd modules/cli
-        GOFLAGS="-mod=vendor" CGO_ENABLED=0 go build \
-          -ldflags="-s -w -X 'github.com/kubetail-org/kubetail/modules/cli/cmd.version=${version}'" \
-          -o ../../bin/kubetail \
-          main.go
-        cd ../../
+    vendorHash = "sha256-kC9UMhRSDvTd7xPRehZiDvQyfCO9o9qSSOaI92zaVME=";
 
-        runHook postBuild
-      '';
+    GOWORK = "off";
 
-      installPhase = ''
-        runHook preInstall
+    ldflags = [
+      "-s"
+      "-w"
+      "-X github.com/kubetail-org/kubetail/modules/cli/cmd.version=${version}"
+    ];
 
-        install -Dm755 bin/kubetail $out/bin/kubetail
+    doCheck = false;
 
-        runHook postInstall
-      '';
+    postInstall = ''
+      mv $out/bin/{cli,${pname}}
+
+      installShellCompletion --cmd ${pname}         \
+        --bash <($out/bin/${pname} completion bash) \
+        --fish <($out/bin/${pname} completion fish) \
+        --zsh  <($out/bin/${pname} completion zsh)
+    '';
+
+    meta = {
+      description = "Real-time logging dashboard for Kubernetes";
+      homepage = "https://github.com/kubetail-org/kubetail";
+      mainProgram = pname;
     };
-
-  # The packages that are tagged releases
-  taggedPackages =
-    lib.attrsets.mapAttrs
-    (k: v: mkSourceInstall {
-      version = k;
-      url = v.url;
-      hash = v.hash;
-      goDepsSrc = v.vendorBundles.go;
-      pnpmDepsSrc = v.vendorBundles.pnpm;
-    })
-    (lib.attrsets.filterAttrs
-      (k: v: (v.url or null) != null && (v.hash or null) != null)
-      sources);
-
-  # This determines the latest /released/ version.
-  latest = lib.lists.last (
-    builtins.sort
-    (x: y: (builtins.compareVersions x y) < 0)
-    (builtins.attrNames taggedPackages)
-  );
+  };
 in
-  # We want the packages but also add a "default" that just points to the
-  # latest released version.
-  taggedPackages // {"default" = taggedPackages.${latest};}
+backend
