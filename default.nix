@@ -1,5 +1,14 @@
 {
-  pkgs ? import <nixpkgs> { },
+  pkgs ? import (
+    let
+      lock = builtins.fromJSON (builtins.readFile ./flake.lock);
+      nixpkgs = lock.nodes.nixpkgs.locked;
+    in
+    builtins.fetchTarball {
+      url = "https://github.com/${nixpkgs.owner}/${nixpkgs.repo}/archive/${nixpkgs.rev}.tar.gz";
+      sha256 = nixpkgs.narHash;
+    }
+  ) { },
 }:
 
 let
@@ -28,7 +37,7 @@ let
     pnpmDeps = pkgs.pnpm.fetchDeps {
       inherit pname version;
       src = "${src}/dashboard-ui";
-      hash = "sha256-CwHHR1hhIDWfMJSlFkPuOmf/mTzbNt4RWEHPwJ5fJO8=";
+      hash = "sha256-Ph06qKzdle4nFU7PQhrGlxOeP13EqtG43tVd55GkTvg=";
       fetcherVersion = 2;
     };
 
@@ -44,22 +53,18 @@ let
   };
 
   backend = pkgs.buildGoModule {
-    inherit pname version;
-    src = "${src}/modules";
+    inherit pname version src;
 
     nativeBuildInputs = with pkgs; [
       installShellFiles
     ];
 
-    modRoot = "cli";
+    modRoot = "modules/cli";
     subPackages = [ "." ];
 
-    prePatch = ''
-      rm -rf dashboard/website
-      cp -r ${frontend} dashboard/website
-    '';
+    vendorHash = "sha256-lv18257J2txfCWlusSCUQTr/CBxbnwqOSePtGUpRqBE=";
 
-    vendorHash = "sha256-kC9UMhRSDvTd7xPRehZiDvQyfCO9o9qSSOaI92zaVME=";
+    env.GOWORK = "off";
 
     ldflags = [
       "-s"
@@ -69,12 +74,20 @@ let
 
     doCheck = false;
 
-    preBuild = ''
-      export GOWORK="off"
+    buildPhase = ''
+      runHook preBuild
+
+      chmod -R +w vendor/github.com/kubetail-org/kubetail/modules/dashboard
+      rm -rf vendor/github.com/kubetail-org/kubetail/modules/dashboard/website
+      cp -r ${frontend} vendor/github.com/kubetail-org/kubetail/modules/dashboard/website
+
+      go build -mod="vendor" -ldflags="$ldflags" -o "$GOPATH/bin/" main.go
+
+      runHook postBuild
     '';
 
     postInstall = ''
-      mv $out/bin/{cli,${pname}}
+      mv $out/bin/{main,${pname}}
 
       installShellCompletion --cmd ${pname}         \
         --bash <($out/bin/${pname} completion bash) \
