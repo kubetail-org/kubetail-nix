@@ -1,12 +1,6 @@
 # Nix Packaging for Kubetail
 
-This repository contains Nix packaging for the [Kubetail](https://github.com/kubetail-org/kubetail) project. It is meant to be consumed primarily as a flake but the `default.nix` can also be imported directly by non-flakes too.
-
-Available Packages:
-
-- `kubetail` (default) - The kubetail CLI tool
-
-Additional packages may be added in the future.
+This repository contains Nix packaging for the [`kubetail`](https://github.com/kubetail-org/kubetail) CLI tool. It is meant to be consumed primarily as a flake but the `default.nix` can also be imported directly by non-flakes too.
 
 ## Flake
 
