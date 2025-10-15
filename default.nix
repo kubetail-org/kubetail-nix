@@ -61,8 +61,6 @@ let
 
     vendorHash = "sha256-kC9UMhRSDvTd7xPRehZiDvQyfCO9o9qSSOaI92zaVME=";
 
-    GOWORK = "off";
-
     ldflags = [
       "-s"
       "-w"
@@ -70,6 +68,10 @@ let
     ];
 
     doCheck = false;
+
+    preBuild = ''
+      export GOWORK="off"
+    '';
 
     postInstall = ''
       mv $out/bin/{cli,${pname}}
