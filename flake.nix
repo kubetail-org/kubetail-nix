@@ -18,7 +18,7 @@
         pkgs = import nixpkgs { inherit system; };
       in
       {
-        packages.default = pkgs.callPackage ./default.nix { };
+        packages.default = pkgs.callPackage ./package.nix { };
       }
     );
 }
