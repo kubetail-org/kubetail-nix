@@ -1,0 +1,98 @@
+name: release
+
+permissions:
+  contents: write
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release"
+        required: true
+        type: string
+      dry_run:
+        description: "Dry run"
+        required: true
+        type: boolean
+        default: true
+
+jobs:
+  update-repo:
+    name: Update kubetail-nix repo with new version
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Config
+        id: config
+        run: |
+          echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          echo "dry_run=${{ github.event.inputs.dry_run }}" >> $GITHUB_OUTPUT
+          echo "tag_name=${{ github.event.inputs.version }}-1" >> $GITHUB_OUTPUT
+
+      - name: Download SHA256SUMS
+        id: release-info
+        uses: robinraju/release-downloader@v1.12
+        with:
+          repository: kubetail-org/kubetail
+          tag: ${{ format('cli/v{0}', steps.config.outputs.version) }}
+          fileName: "SHA256SUMS"
+          out-file-path: "downloads"
+
+      - name: Extract shasum
+        id: meta
+        working-directory: ./downloads
+        run: |
+          set -euo pipefail
+
+          SHA256=$( tr -d '\r' < './SHA256SUMS' | awk '$2 == "kubetail-cli.orig.tar.xz" {print $1}' )
+
+          # Convert hex digest to SRI base64 required by Nix hash attribute.
+          SHA256_SRI=$(printf '%s' "$SHA256" | xxd -r -p | base64 | tr -d '\n')
+
+          echo "sha256=$SHA256_SRI" >> $GITHUB_OUTPUT
+
+      - name: Checkout repo
+        uses: actions/checkout@v5
+        with:
+          sparse-checkout: |
+            .github/ci-config/default.nix.tmpl
+            default.nix
+          sparse-checkout-cone-mode: false
+
+      - name: Execute templates
+        env:
+          VERSION: ${{ steps.config.outputs.version }}
+          SHA256: ${{ steps.meta.outputs.sha256 }}
+        run: |
+          set -euo pipefail
+
+          envsubst '${VERSION} ${SHA256}' \
+            < .github/ci-config/default.nix.tmpl \
+            > default.nix
+
+      - name: Debug
+        if: ${{ steps.config.outputs.dry_run == 'true' }}
+        run: |
+          cat default.nix
+
+      - name: Merge into main and tag commit
+        if: ${{ steps.config.outputs.dry_run != 'true' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add default.nix
+          git commit -a -s -m "release: ${{ steps.config.outputs.tag_name }}"
+
+          git push origin
+          git tag "${{ steps.config.outputs.tag_name }}"
+          git push origin --tags
+
+      - name: Create GitHub release
+        if: ${{ steps.config.outputs.dry_run != 'true' }}
+        uses: softprops/action-gh-release@v2.4.1
+        with:
+          draft: true
+          name: "${{ steps.config.outputs.tag_name }}"
+          body: "Release: `kubetail` ${{ steps.config.outputs.version }}"
+          tag_name: "${{ steps.config.outputs.tag_name }}"
+          make_latest: true
