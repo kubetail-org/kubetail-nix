@@ -91,7 +91,7 @@ jobs:
         if: ${{ steps.config.outputs.dry_run != 'true' }}
         uses: softprops/action-gh-release@v2.4.1
         with:
-          draft: true
+          draft: false
           name: "${{ steps.config.outputs.tag_name }}"
           body: "Release: `kubetail` ${{ steps.config.outputs.version }}"
           tag_name: "${{ steps.config.outputs.tag_name }}"
