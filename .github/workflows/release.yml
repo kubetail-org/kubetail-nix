@@ -79,7 +79,6 @@ jobs:
       - name: Configure git
         run: |
           git config gpg.program gpg
-          git config push.gpgsign true
           git config commit.gpgsign true
 
           git config user.name "${{ vars.KUBETAIL_BOT_NAME }}"
