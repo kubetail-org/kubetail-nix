@@ -53,6 +53,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v5
         with:
+          ssh-key: ${{ secrets.KUBETAIL_BOT_SSH_PRIVATE_KEY }}
           sparse-checkout: |
             .github/ci-config/default.nix.tmpl
             default.nix
@@ -69,6 +70,22 @@ jobs:
             < .github/ci-config/default.nix.tmpl \
             > default.nix
 
+      - name: Configure gpg
+        uses: crazy-max/ghaction-import-gpg@v6.3.0
+        with:
+          gpg_private_key: ${{ secrets.KUBETAIL_BOT_PGP_SIGNING_KEY }}
+          passphrase: ${{ secrets.KUBETAIL_BOT_PGP_PASSWORD }}
+
+      - name: Configure git
+        run: |
+          git config gpg.program gpg
+          git config push.gpgsign true
+          git config commit.gpgsign true
+
+          git config user.name "${{ vars.KUBETAIL_BOT_NAME }}"
+          git config user.email "${{ vars.KUBETAIL_BOT_EMAIL }}"
+          git config user.signingkey "${{ vars.KUBETAIL_BOT_PGP_FINGERPRINT }}"
+
       - name: Debug
         if: ${{ steps.config.outputs.dry_run == 'true' }}
         run: |
@@ -77,14 +94,21 @@ jobs:
       - name: Merge into main and tag commit
         if: ${{ steps.config.outputs.dry_run != 'true' }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
+          # Stage changes
           git add default.nix
-          git commit -a -s -m "release: ${{ steps.config.outputs.tag_name }}"
 
+          # Check if there are changes to commit
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+
+          # Commit and push
+          git commit -a -s -m "release: ${{ steps.config.outputs.tag_name }}"
           git push origin
-          git tag "${{ steps.config.outputs.tag_name }}"
+
+          # Tag and push
+          git tag -s "${{ steps.config.outputs.tag_name }}" -m "release: ${{ steps.config.outputs.tag_name }}"
           git push origin --tags
 
       - name: Create GitHub release
