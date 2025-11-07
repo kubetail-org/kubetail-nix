@@ -2,6 +2,7 @@ name: release
 
 permissions:
   contents: write
+  deployments: write
 
 on:
   workflow_dispatch:
@@ -19,6 +20,7 @@ on:
 jobs:
   update-repo:
     name: Update kubetail-nix repo with new version
+    environment: production
     runs-on: ubuntu-24.04
     steps:
       - name: Config
@@ -53,7 +55,6 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v5
         with:
-          ssh-key: ${{ secrets.KUBETAIL_BOT_SSH_PRIVATE_KEY }}
           sparse-checkout: |
             .github/ci-config/default.nix.tmpl
             default.nix
