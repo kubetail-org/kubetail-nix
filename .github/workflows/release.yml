@@ -45,7 +45,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          SHA256=$( tr -d '\r' < './SHA256SUMS' | awk '$2 == "kubetail-cli.orig.tar.xz" {print $1}' )
+          SHA256=$( tr -d '\r' < './SHA256SUMS' | awk '$2 == "kubetail-${{ steps.config.outputs.version }}-vendored.tar.gz" {print $1}' )
 
           # Convert hex digest to SRI base64 required by Nix hash attribute.
           SHA256_SRI=$(printf '%s' "$SHA256" | xxd -r -p | base64 | tr -d '\n')
