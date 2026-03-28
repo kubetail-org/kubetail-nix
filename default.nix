@@ -13,11 +13,11 @@
 
 pkgs.buildGoModule rec {
   pname = "kubetail";
-  version = "0.12.1";
+  version = "0.12.2";
 
   src = pkgs.fetchurl {
     url = "https://github.com/kubetail-org/kubetail/releases/download/cli%2Fv${version}/kubetail-${version}-vendored.tar.gz";
-    hash = "sha256-1NzK6B9B7uTpw8vX8UaWouIDZ6J/88B2SfD1dFECWss=";
+    hash = "sha256-s57TRGZi2HWg2ZjNUQlkyTjsw/2HPVISPS/l0r+GJ0U=";
   };
 
   nativeBuildInputs = with pkgs; [
