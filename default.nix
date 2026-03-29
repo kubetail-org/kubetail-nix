@@ -32,11 +32,7 @@ pkgs.buildGoModule rec {
 
   env.GOWORK = "off";
 
-  env.CGO_ENABLED = 0;
-
   ldflags = [
-    "-s"
-    "-w"
     "-X github.com/kubetail-org/kubetail/modules/cli/cmd.version=${version}"
   ];
 
